@@ -1,10 +1,13 @@
 #include <AFMotor.h>
 
 // --- Motores ---
-AF_DCMotor motorEsq(1);  // M1
-AF_DCMotor motorDir(2);  // M2
-AF_DCMotor motorEsq2(3); // M3
-AF_DCMotor motorDir2(4); // M4
+// Direita -> M1 (frente) e M4 (trás)
+AF_DCMotor motorDir(1);     
+AF_DCMotor motorDirTraz(4); 
+
+// Esquerda -> M2 (frente) e M3 (trás)
+AF_DCMotor motorEsq(2);     
+AF_DCMotor motorEsqTraz(3); 
 
 // --- Sensores ultrassônicos ---
 // Sensor DIREITO -> A0 e A1
@@ -25,14 +28,17 @@ AF_DCMotor motorDir2(4); // M4
 #define DISTANCIA_LIMITE 10
 #define DISTANCIA_LIMITE_LATERAL 5
 
+// Velocidade dos motores
+#define VEL_ESQ 200
+#define VEL_DIR 200
+
 void setup() {
   Serial.begin(9600);
 
-  // Define velocidade para todos os motores
-  motorEsq.setSpeed(200);
-  motorDir.setSpeed(200);
-  motorEsq2.setSpeed(200);
-  motorDir2.setSpeed(200);
+  motorEsq.setSpeed(VEL_ESQ);  
+  motorEsqTraz.setSpeed(VEL_ESQ); 
+  motorDir.setSpeed(VEL_DIR);  
+  motorDirTraz.setSpeed(VEL_DIR); 
 
   pararMotores();
 
@@ -42,9 +48,13 @@ void setup() {
   pinMode(ECHO_DIR, INPUT);
   pinMode(TRIG_FRT, OUTPUT);
   pinMode(ECHO_FRT, INPUT);
+
+  Serial.println("Setup concluído!");
 }
 
-// --- Função para medir distância ---
+// ----------------------
+// Função para medir distância
+// ----------------------
 long medirDistancia(int trigPin, int echoPin){
   digitalWrite(trigPin, LOW);
   delayMicroseconds(2);
@@ -60,68 +70,85 @@ long medirDistancia(int trigPin, int echoPin){
   return distancia;
 }
 
-// --- Funções de movimento ---
-void pararMotores(){
+// ----------------------
+// Funções de controle motores
+// ----------------------
+
+// --- Motores da ESQUERDA ---
+void esquerdaFrente() {
+  motorEsq.run(FORWARD);
+  motorEsqTraz.run(FORWARD);
+}
+void esquerdaTras() {
+  motorEsq.run(BACKWARD);
+  motorEsqTraz.run(BACKWARD);
+}
+void esquerdaParar() {
   motorEsq.run(RELEASE);
-  motorDir.run(RELEASE);
-  motorEsq2.run(RELEASE);
-  motorDir2.run(RELEASE);
+  motorEsqTraz.run(RELEASE);
 }
 
-void andarFrente(){
-  motorEsq.run(FORWARD);
+// --- Motores da DIREITA ---
+void direitaFrente() {
   motorDir.run(FORWARD);
-  motorEsq2.run(FORWARD);
-  motorDir2.run(FORWARD);
+  motorDirTraz.run(FORWARD);
+}
+void direitaTras() {
+  motorDir.run(BACKWARD);
+  motorDirTraz.run(BACKWARD);
+}
+void direitaParar() {
+  motorDir.run(RELEASE);
+  motorDirTraz.run(RELEASE);
+}
+
+// --- Controle geral ---
+void pararMotores() {
+  esquerdaParar();
+  direitaParar();
+  Serial.println("Motores parados");
+}
+void andarFrente() {
+  esquerdaFrente();
+  direitaFrente();
   Serial.println("Andando para FRENTE");
 }
-
-void andarTras(){
-  motorEsq.run(BACKWARD);
-  motorDir.run(BACKWARD);
-  motorEsq2.run(BACKWARD);
-  motorDir2.run(BACKWARD);
+void andarTras() {
+  esquerdaTras();
+  direitaTras();
   Serial.println("Re quando necessário");
 }
-
-void virarEsq(){
-  motorEsq.run(FORWARD);
-  motorDir.run(BACKWARD);
-  motorEsq2.run(FORWARD);
-  motorDir2.run(BACKWARD);
+void virarEsq() {
+  esquerdaTras();
+  direitaFrente();
   Serial.println("Virando ESQUERDA");
 }
-
-void virarDir(){
-  motorEsq.run(BACKWARD);
-  motorDir.run(FORWARD);
-  motorEsq2.run(BACKWARD);
-  motorDir2.run(FORWARD);
+void virarDir() {
+  esquerdaFrente();
+  direitaTras();
   Serial.println("Virando DIREITA");
 }
 
-// --- Nova função procurar caminho ---
+// ----------------------
+// Função procurar caminho
+// ----------------------
 void procurarCaminho(){
   Serial.println("Todos bloqueados! Procurando caminho...");
 
-  // 1. Dá ré por um tempo curto
   andarTras();
   delay(400);
   pararMotores();
 
-  // 2. Mede virando para a direita
   virarDir();
   delay(500);
   pararMotores();
   long distDirTest = medirDistancia(TRIG_DIR, ECHO_DIR);
 
-  // 3. Mede virando para a esquerda
   virarEsq();
   delay(1000);
   pararMotores();
   long distEsqTest = medirDistancia(TRIG_ESQ, ECHO_ESQ);
 
-  // 4. Decide para onde ir
   if(distDirTest > distEsqTest){
     Serial.println("Direita tem mais espaço!");
     virarDir();
@@ -135,7 +162,9 @@ void procurarCaminho(){
   pararMotores();
 }
 
-// --- Loop principal ---
+// ----------------------
+// Loop principal
+// ----------------------
 void loop() {
   long distEsq = medirDistancia(TRIG_ESQ, ECHO_ESQ);
   long distDir = medirDistancia(TRIG_DIR, ECHO_DIR);
@@ -145,16 +174,13 @@ void loop() {
   Serial.print(" | Dir: "); Serial.print(distDir);
   Serial.print(" | Frt: "); Serial.println(distFrt);
 
-  // --- Situação crítica: todos bloqueados ---
   if(distFrt < DISTANCIA_LIMITE && distEsq < DISTANCIA_LIMITE && distDir < DISTANCIA_LIMITE){
     procurarCaminho();
   }
-  // --- Situação crítica parcial: frente e um lado bloqueados ---
   else if( (distFrt < DISTANCIA_LIMITE_LATERAL && distEsq < DISTANCIA_LIMITE_LATERAL) || 
            (distFrt < DISTANCIA_LIMITE_LATERAL && distDir < DISTANCIA_LIMITE_LATERAL) ){
     procurarCaminho();
   }
-  // --- Sensor lateral independente ---
   else if(distEsq < DISTANCIA_LATERAL){
     virarDir();
     delay(700);
@@ -165,7 +191,6 @@ void loop() {
     delay(700);
     pararMotores();
   }
-  // --- Lógica normal ---
   else if(distFrt >= DISTANCIA_CRITICA){
     andarFrente();
   }
