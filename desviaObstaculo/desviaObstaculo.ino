@@ -1,46 +1,41 @@
 #include <AFMotor.h>
 
 // --- Motores ---
-// Direita -> M1 (frente) e M4 (trás)
-AF_DCMotor motorDir(1);     
-AF_DCMotor motorDirTraz(4); 
+// Direita -> M2 (frente) e M1 (trás)
+AF_DCMotor motorDirFrente(2);
+AF_DCMotor motorDirTraz(1);
 
-// Esquerda -> M2 (frente) e M3 (trás)
-AF_DCMotor motorEsq(2);     
-AF_DCMotor motorEsqTraz(3); 
+// Esquerda -> M3 (frente) e M4 (trás)
+AF_DCMotor motorEsqFrente(3);
+AF_DCMotor motorEsqTraz(4);
 
 // --- Sensores ultrassônicos ---
-// Sensor DIREITO -> A0 e A1
 #define TRIG_DIR A0
 #define ECHO_DIR A1
 
-// Sensor ESQUERDO -> A2 e A3
 #define TRIG_ESQ A2
 #define ECHO_ESQ A3
 
-// Sensor FRONTAL -> A4 e A5
 #define TRIG_FRT A4
 #define ECHO_FRT A5
 
-// --- Configuração --- em cm
-#define DISTANCIA_CRITICA 40 
-#define DISTANCIA_LATERAL 20 
-#define DISTANCIA_LIMITE 10
-#define DISTANCIA_LIMITE_LATERAL 5
+// --- Configurações ---
+#define DISTANCIA       20   // distância mínima frontal
+#define LIMITE          5    // distância crítica
+#define INTERVALO_DELAY 20   // tempo base para sincronização
+#define VEL_ESQ         200
+#define VEL_DIR         200
 
-// Velocidade dos motores
-#define VEL_ESQ 200
-#define VEL_DIR 200
-
+// ----------------------
+// Setup
+// ----------------------
 void setup() {
   Serial.begin(9600);
 
-  motorEsq.setSpeed(VEL_ESQ);  
+  motorEsqFrente.setSpeed(VEL_ESQ);  
   motorEsqTraz.setSpeed(VEL_ESQ); 
-  motorDir.setSpeed(VEL_DIR);  
+  motorDirFrente.setSpeed(VEL_DIR);  
   motorDirTraz.setSpeed(VEL_DIR); 
-
-  pararMotores();
 
   pinMode(TRIG_ESQ, OUTPUT);
   pinMode(ECHO_ESQ, INPUT);
@@ -49,7 +44,8 @@ void setup() {
   pinMode(TRIG_FRT, OUTPUT);
   pinMode(ECHO_FRT, INPUT);
 
-  Serial.println("Setup concluído!");
+  pararMotores();
+  Serial.println("✅ Setup concluído!");
 }
 
 // ----------------------
@@ -65,96 +61,71 @@ long medirDistancia(int trigPin, int echoPin){
   long duracao = pulseIn(echoPin, HIGH, 20000); 
   long distancia = duracao * 0.034 / 2;
 
-  if(distancia == 0 || distancia > 200) return 200;
-
+  if (distancia == 0 || distancia > 200) return 200;
   return distancia;
 }
 
 // ----------------------
 // Funções de controle motores
 // ----------------------
+void esquerdaFrente()  { motorEsqFrente.run(FORWARD);  motorEsqTraz.run(FORWARD); }
+void esquerdaTras()    { motorEsqFrente.run(BACKWARD); motorEsqTraz.run(BACKWARD); }
+void direitaFrente()   { motorDirFrente.run(FORWARD);  motorDirTraz.run(FORWARD); }
+void direitaTras()     { motorDirFrente.run(BACKWARD); motorDirTraz.run(BACKWARD); }
 
-// --- Motores da ESQUERDA ---
-void esquerdaFrente() {
-  motorEsq.run(FORWARD);
-  motorEsqTraz.run(FORWARD);
-}
-void esquerdaTras() {
-  motorEsq.run(BACKWARD);
-  motorEsqTraz.run(BACKWARD);
-}
-void esquerdaParar() {
-  motorEsq.run(RELEASE);
+void pararMotores() {
+  motorEsqFrente.run(RELEASE);
   motorEsqTraz.run(RELEASE);
-}
-
-// --- Motores da DIREITA ---
-void direitaFrente() {
-  motorDir.run(FORWARD);
-  motorDirTraz.run(FORWARD);
-}
-void direitaTras() {
-  motorDir.run(BACKWARD);
-  motorDirTraz.run(BACKWARD);
-}
-void direitaParar() {
-  motorDir.run(RELEASE);
+  motorDirFrente.run(RELEASE);
   motorDirTraz.run(RELEASE);
 }
 
-// --- Controle geral ---
-void pararMotores() {
-  esquerdaParar();
-  direitaParar();
-  Serial.println("Motores parados");
+void andarFrente() { 
+  esquerdaFrente(); 
+  direitaFrente(); 
 }
-void andarFrente() {
-  esquerdaFrente();
-  direitaFrente();
-  Serial.println("Andando para FRENTE");
+
+void andarTras() { 
+  esquerdaTras(); 
+  direitaTras(); 
 }
-void andarTras() {
-  esquerdaTras();
-  direitaTras();
-  Serial.println("Re quando necessário");
+
+void virarEsq() { 
+  esquerdaTras(); 
+  direitaFrente(); 
 }
-void virarEsq() {
-  esquerdaTras();
-  direitaFrente();
-  Serial.println("Virando ESQUERDA");
-}
-void virarDir() {
-  esquerdaFrente();
-  direitaTras();
-  Serial.println("Virando DIREITA");
+
+void virarDir() { 
+  esquerdaFrente(); 
+  direitaTras(); 
 }
 
 // ----------------------
 // Função procurar caminho
 // ----------------------
 void procurarCaminho(){
-  Serial.println("Todos bloqueados! Procurando caminho...");
+  Serial.println("🚧 Todos bloqueados! Procurando caminho...");
 
   andarTras();
   delay(400);
   pararMotores();
 
   virarDir();
-  delay(500);
+  delay(400);
   pararMotores();
   long distDirTest = medirDistancia(TRIG_DIR, ECHO_DIR);
 
   virarEsq();
-  delay(1000);
+  delay(500);
   pararMotores();
   long distEsqTest = medirDistancia(TRIG_ESQ, ECHO_ESQ);
 
-  if(distDirTest > distEsqTest){
-    Serial.println("Direita tem mais espaço!");
+  if (distDirTest > distEsqTest) {
+    Serial.println("↪️ Direita tem mais espaço! Virando para DIREITA...");
     virarDir();
     delay(600);
   } else {
-    Serial.println("Esquerda tem mais espaço!");
+    Serial.println("↩️ Esquerda tem mais espaço! Virando para ESQUERDA...");
     virarEsq();
     delay(600);
   }
@@ -174,40 +145,28 @@ void loop() {
   Serial.print(" | Dir: "); Serial.print(distDir);
   Serial.print(" | Frt: "); Serial.println(distFrt);
 
-  if(distFrt < DISTANCIA_LIMITE && distEsq < DISTANCIA_LIMITE && distDir < DISTANCIA_LIMITE){
+  if (distFrt <= LIMITE) {
+    Serial.println("🚨 Obstáculo muito próximo! Ativando procurarCaminho()");
     procurarCaminho();
-  }
-  else if( (distFrt < DISTANCIA_LIMITE_LATERAL && distEsq < DISTANCIA_LIMITE_LATERAL) || 
-           (distFrt < DISTANCIA_LIMITE_LATERAL && distDir < DISTANCIA_LIMITE_LATERAL) ){
-    procurarCaminho();
-  }
-  else if(distEsq < DISTANCIA_LATERAL){
-    virarDir();
-    delay(700);
+    delay(300);
     pararMotores();
   }
-  else if(distDir < DISTANCIA_LATERAL){
-    virarEsq();
-    delay(700);
+  else if (distFrt <= DISTANCIA) {
+    if (distEsq <= distDir) {
+      Serial.println("↩️ Virando para ESQUERDA");
+      virarEsq();
+      delay(300);
+    } else {
+      Serial.println("↪️ Virando para DIREITA");
+      virarDir();
+      delay(300);
+    }
     pararMotores();
   }
-  else if(distFrt >= DISTANCIA_CRITICA){
+  else {
+    Serial.println("⬆️ Caminho livre — Andando para FRENTE");
     andarFrente();
   }
-  else{
-    if(distEsq > distDir){
-      virarEsq();
-      delay(500);
-    }
-    else if(distDir >= distEsq){
-      virarDir();
-      delay(500);
-    }
-    else{
-      andarTras();
-      delay(500);
-    }
-  }
 
-  delay(200);
+  delay(INTERVALO_DELAY);
 }
