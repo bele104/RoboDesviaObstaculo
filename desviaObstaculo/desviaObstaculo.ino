@@ -20,11 +20,11 @@ AF_DCMotor motorEsqTraz(4);
 #define ECHO_FRT A5
 
 // --- Configurações ---
-#define DISTANCIA       20   // distância mínima frontal
+#define DISTANCIA       25   // distância mínima frontal
 #define LIMITE          5    // distância crítica
 #define INTERVALO_DELAY 20   // tempo base para sincronização
-#define VEL_ESQ         200
-#define VEL_DIR         200
+#define VEL_ESQ         150
+#define VEL_DIR         150
 
 // ----------------------
 // Setup
@@ -61,7 +61,7 @@ long medirDistancia(int trigPin, int echoPin){
   long duracao = pulseIn(echoPin, HIGH, 20000); 
   long distancia = duracao * 0.034 / 2;
 
-  if (distancia == 0 || distancia > 200) return 200;
+  if (distancia == 0 || distancia > 200) return 1;
   return distancia;
 }
 
@@ -81,6 +81,7 @@ void pararMotores() {
 }
 
 void andarFrente() { 
+
   esquerdaFrente(); 
   direitaFrente(); 
 }
@@ -91,6 +92,7 @@ void andarTras() {
 }
 
 void virarEsq() { 
+
   esquerdaTras(); 
   direitaFrente(); 
 }
@@ -98,39 +100,6 @@ void virarEsq() {
 void virarDir() { 
   esquerdaFrente(); 
   direitaTras(); 
-}
-
-// ----------------------
-// Função procurar caminho
-// ----------------------
-void procurarCaminho(){
-  Serial.println("🚧 Todos bloqueados! Procurando caminho...");
-
-  andarTras();
-  delay(400);
-  pararMotores();
-
-  virarDir();
-  delay(400);
-  pararMotores();
-  long distDirTest = medirDistancia(TRIG_DIR, ECHO_DIR);
-
-  virarEsq();
-  delay(500);
-  pararMotores();
-  long distEsqTest = medirDistancia(TRIG_ESQ, ECHO_ESQ);
-
-  if (distDirTest > distEsqTest) {
-    Serial.println("↪️ Direita tem mais espaço! Virando para DIREITA...");
-    virarDir();
-    delay(600);
-  } else {
-    Serial.println("↩️ Esquerda tem mais espaço! Virando para ESQUERDA...");
-    virarEsq();
-    delay(600);
-  }
-
-  pararMotores();
 }
 
 // ----------------------
@@ -145,18 +114,36 @@ void loop() {
   Serial.print(" | Dir: "); Serial.print(distDir);
   Serial.print(" | Frt: "); Serial.println(distFrt);
 
-  if (distFrt <= LIMITE) {
-    Serial.println("🚨 Obstáculo muito próximo! Ativando procurarCaminho()");
-    procurarCaminho();
-    delay(300);
+  if (distEsq <= LIMITE) {
+    pararMotores();
+    Serial.println("🚨 Obstáculo muito próximo! ");
+      Serial.println("↪️ Virando para DIREITA");
+      andarTras();
+      delay(300);
+      virarDir();
+      delay(300);
+    pararMotores();
+  }
+  if (distEsq <= LIMITE) {
+    pararMotores();
+    Serial.println("🚨 Obstáculo muito próximo! ");
+    Serial.println("↩️ Virando para ESQUERDA");
+      andarTras();
+      delay(300);
+      virarEsq();
+      delay(300);
     pararMotores();
   }
   else if (distFrt <= DISTANCIA) {
+      andarTras();
+      delay(300);
     if (distEsq <= distDir) {
+      pararMotores();
       Serial.println("↩️ Virando para ESQUERDA");
       virarEsq();
       delay(300);
     } else {
+      pararMotores();
       Serial.println("↪️ Virando para DIREITA");
       virarDir();
       delay(300);
