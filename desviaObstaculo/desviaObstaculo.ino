@@ -20,11 +20,11 @@ AF_DCMotor motorEsqTraz(4);
 #define ECHO_FRT A5
 
 // --- Configurações ---
-#define DISTANCIA       25   // distância mínima frontal
+#define DISTANCIA       34   // distância mínima frontal
 #define LIMITE          5    // distância crítica
 #define INTERVALO_DELAY 20   // tempo base para sincronização
-#define VEL_ESQ         150
-#define VEL_DIR         150
+#define VEL_ESQ         190
+#define VEL_DIR         190
 
 // ----------------------
 // Setup
@@ -61,7 +61,7 @@ long medirDistancia(int trigPin, int echoPin){
   long duracao = pulseIn(echoPin, HIGH, 20000); 
   long distancia = duracao * 0.034 / 2;
 
-  if (distancia == 0 || distancia > 200) return 1;
+  if (distancia == 0 || distancia > 200) return 200;
   return distancia;
 }
 
@@ -92,14 +92,14 @@ void andarTras() {
 }
 
 void virarEsq() { 
+  esquerdaFrente(); 
+  direitaTras(); 
 
-  esquerdaTras(); 
-  direitaFrente(); 
 }
 
 void virarDir() { 
-  esquerdaFrente(); 
-  direitaTras(); 
+  esquerdaTras(); 
+  direitaFrente(); 
 }
 
 // ----------------------
@@ -114,36 +114,13 @@ void loop() {
   Serial.print(" | Dir: "); Serial.print(distDir);
   Serial.print(" | Frt: "); Serial.println(distFrt);
 
-  if (distEsq <= LIMITE) {
-    pararMotores();
-    Serial.println("🚨 Obstáculo muito próximo! ");
-      Serial.println("↪️ Virando para DIREITA");
-      andarTras();
-      delay(300);
-      virarDir();
-      delay(300);
-    pararMotores();
-  }
-  if (distEsq <= LIMITE) {
-    pararMotores();
-    Serial.println("🚨 Obstáculo muito próximo! ");
-    Serial.println("↩️ Virando para ESQUERDA");
-      andarTras();
-      delay(300);
-      virarEsq();
-      delay(300);
-    pararMotores();
-  }
-  else if (distFrt <= DISTANCIA) {
-      andarTras();
-      delay(300);
-    if (distEsq <= distDir) {
-      pararMotores();
+ if (distFrt <= DISTANCIA) {
+
+    if (distEsq > distDir) {
       Serial.println("↩️ Virando para ESQUERDA");
       virarEsq();
       delay(300);
     } else {
-      pararMotores();
       Serial.println("↪️ Virando para DIREITA");
       virarDir();
       delay(300);
